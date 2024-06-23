@@ -1,5 +1,13 @@
 <?php
 
+/*
+  https://cine.x20.space/
+  ?day=[1-7]  # Montag bis Sonntag
+  &from=12:00 # von-uhrzeit
+  &to=17:00   # bis-uhrzeit
+  &all        # zeige, wenn heute, auch vergangene, ausser wenn von-bis eingeschraenkt
+*/
+
 date_default_timezone_set( 'Europe/Paris' );
 $url = 'https://www.cinecitta.de/common/ajax.php?bereich=portal&modul_id=101&klasse=vorstellungen&cli_mode=1&com=anzeigen_spielplan';
 $lfn = 'cine-spielplan.json';
@@ -115,10 +123,18 @@ foreach($items as $item) {
         $f = $item->{'film_titel'};
         $filme[$f] = preg_replace("/\"/", "'", $item->{'film_beschreibung'});
 
-        if ( $d == $qday && (! ($qday == $today && $u < $y )) && (!( in_array("OV", $flags) && ($item->{'film_ist_ov'} == 0)))) { // dupe check
-          if (! array_key_exists($f, $instances))     { $instances[$f] = array(); }
-          if (! array_key_exists($t, $instances[$f])) { $instances[$f][$t] = array(); }
-          array_push($instances[$f][$t], sprintf("%s<sup><small>%s</small></sup>", $u,  (count($flags) > 0 ? ("&nbsp;" . join("&nbsp;", $flags)) : "")));
+        $show = true;
+        if (( in_array("OV", $flags) && ($item->{'film_ist_ov'} == 1 ))) { $show = false; } // dupefilter: ov wird als ov und im normalen film eingeblendet
+        if (array_key_exists('from', $_GET) && $_GET['from'] > $u)       { $show = false; }
+        if (array_key_exists('to',   $_GET) && $_GET['to']   < $u)       { $show = false; }
+        if ($qday == $today && $u < $y && !array_key_exists('from', $_GET) && !array_key_exists('to', $_GET) 
+            && !array_key_exists('all', $_GET)) { $show = $false; } // ignoriere vergangene sendungen fuer heute
+        if ($d != $qday) { $show = $false; } // ignoriere alle tage ausser den abgefragten
+
+        if ($show == true) { // dupe check
+              if (! array_key_exists($f, $instances))     { $instances[$f] = array(); }
+              if (! array_key_exists($t, $instances[$f])) { $instances[$f][$t] = array(); }
+              array_push($instances[$f][$t], sprintf("%s<sup><small>%s</small></sup>", $u,  (count($flags) > 0 ? ("&nbsp;" . join("&nbsp;", $flags)) : "")));
         }
       }
     }
@@ -167,6 +183,11 @@ $sorted_filme = array_keys($instances);
      #movies tr td {
          vertical-align: top;
      }
+     .warning {
+         padding: 2px;
+         background-color: #c12;
+         color: #fff;
+     }
    </style>
  </header>
  <body>
@@ -180,6 +201,12 @@ $sorted_filme = array_keys($instances);
  
        }  ?>
        (<?= $qday ?> / <?= $today ?>)
+
+       <span class='warning'>
+       <?= array_key_exists('from', $_GET) ? " -  <b>Filter von: " . $_GET['from'] :"" ?>
+       <?= array_key_exists('to', $_GET)   ? " -  <b>Filter bis: " . $_GET['to'] :"" ?>
+       <?= array_key_exists('all', $_GET)  ? " -  <b>Filter ALLES" :"" ?>
+       </span>
      </div>
      <div id="legend">
        <b><u>Legende</u></b>: Kinos sind nach Grösse des Saals sortiert, Filme nach Anzahl Vorstellungen, Hover ueber beides zeigt Details (Sitze, Grösse Leinwand qm beim Kino), 
@@ -215,6 +242,7 @@ $sorted_filme = array_keys($instances);
                if (preg_match("/3D/", $cell)) { $rgb = $rgb + 0x8000; }
                if (preg_match("/OV/", $cell)) { $rgb = $rgb + 0xF0; }
                if (preg_match("/mU/", $cell)) { $rgb = $rgb + 0xA; }
+               if (preg_match("/deaktiviert/", $cell)) { $rgb = 0xAAAAAA; }
                if (preg_match("/gelb/", $cell)) { $border = "border: 5px solid #a90;"; }
                if (preg_match("/orange/", $cell)) { $border = "border: 5px solid #d85;"; }
       ?>       <td style='padding: 2px; <?= $border ?>; color: #fff; background-color: #<?= substr('00000' . dechex($rgb), -6); ?>;'>
