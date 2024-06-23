@@ -225,5 +225,6 @@ $sorted_filme = array_keys($instances);
          </tr>
 <?php  }  ?>
      </table>
+     <small><a href='https://gl.v4.x20.space/mc/cine/-/blob/main/index.php'>code</a></small>
   </body>
 </html>
