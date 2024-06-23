@@ -2,7 +2,7 @@
 
 date_default_timezone_set( 'Europe/Paris' );
 $url = 'https://www.cinecitta.de/common/ajax.php?bereich=portal&modul_id=101&klasse=vorstellungen&cli_mode=1&com=anzeigen_spielplan';
-$lfn = '/var/www/cine/cine-spielplan.json';
+$lfn = 'cine-spielplan.json';
 
 $tage = array(
     1 => "Montag",
@@ -54,9 +54,9 @@ $kinos = array(
 );
 
 
-function is_past($day, $today){
-    if ($today <= 3 && $today <= 3 && $today > $day) { return true; }
-    if ($today > $day) { return true; }
+function is_past($testday, $referenceday){
+    if ( $testday <= 3 && $referenceday > 3 ) { return false; } 
+    if ( $testday < $referenceday ) { return true; }
     return false;
 }
 
@@ -77,7 +77,6 @@ function get_cache_or_remote($local, $remote) {
         $fd = fopen($local, "w");
         fwrite($fd, $data);
         fclose($fd);
-
     } 
     return file($local);
 }
