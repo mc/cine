@@ -6,6 +6,7 @@
   &from=12:00 # von-uhrzeit
   &to=17:00   # bis-uhrzeit
   &all        # zeige, wenn heute, auch vergangene, ausser wenn von-bis eingeschraenkt
+  &by=movie   # movie|theater, defaults to theater
 */
 
 date_default_timezone_set( 'Europe/Paris' );
@@ -61,6 +62,83 @@ $kinos = array(
     "Metropolis<br/>Kino 2" => "?", 
 );
 
+function display_table_by_theater($k, $f) {
+  uasort($f, function(array $x, array $y) {return $x <=> $y; });
+  $sorted_filme = array_reverse(array_keys($f));
+?>
+     <table id="movies">
+       <tr> <!-- header -->
+         <td>/</td>
+<?php    foreach($k as $kino => $w) { ?>
+           <td class='rotate'>
+             <div title="<?= $k[$kino] ?>">
+               <?= $kino ?>
+             </div>
+           </td>
+<?php    } ?>
+       </tr>
+
+<?php  foreach($sorted_filme as $film => $v) { ?>
+         <tr<?= (preg_match("/OV/", $v))? " style='background-color: #cef;'" :""?>>
+           <td title="<?= $f[$v] ?>" ><?= $v ?></td>
+<?php      foreach($k as $kino => $w) { 
+             if (array_key_exists($v, $f) && array_key_exists($kino, $f[$v])) { 
+               $rgb = 0; $color = "#fff";
+               $border = "";
+               $cell = join("<br>", $f[$v][$kino]);
+               if (preg_match("/UA/", $cell)) { $rgb = $rgb + 0x800000; }
+               if (preg_match("/3D/", $cell)) { $rgb = $rgb + 0x8000; }
+               if (preg_match("/OV/", $cell)) { $rgb = $rgb + 0xF0; }
+               if (preg_match("/mU/", $cell)) { $rgb = $rgb + 0xA; }
+               if (preg_match("/deaktiviert/", $cell)) { $rgb = 0xAAAAAA; }
+               if (preg_match("/gelb/", $cell)) { $border = "border: 5px solid #a90;"; }
+               if (preg_match("/orange/", $cell)) { $border = "border: 5px solid #d85;"; }
+      ?>       <td style='padding: 2px; <?= $border ?>; color: #fff; background-color: #<?= substr('00000' . dechex($rgb), -6); ?>;'>
+                 <?= $cell ?>
+               </td>
+<?php        } else { print("<td/>"); }
+           } ?>
+         </tr>
+<?php  }  ?>
+     </table>
+<?php } 
+
+function display_table_by_movie($k, $f) {
+  uasort($f, function(array $x, array $y) {return $x <=> $y; });
+  $sorted_filme = array_reverse(array_keys($f));
+?>
+     <table id="movies">
+       <tr>
+<?php    foreach($sorted_filme as $film => $v) { ?>
+           <td class='rotate'><div title="<?= $f[$v] ?>" ><?= $v ?></div></td>
+<?php    }  ?>
+       </tr>
+<?php  foreach($sorted_filme as $film => $v) { ?>
+<?php  $cell = array(); ?>
+<?php      foreach($k as $kino => $w) { 
+             if (array_key_exists($v, $f) && array_key_exists($kino, $f[$v])) { 
+               $cell = array_merge($cell, $f[$v][$kino]);
+             } ?>
+<?php      } ?>
+           <td>
+<?php        sort($cell);
+             foreach ($cell as $c) {
+               $rgb = 0; $color = "#fff";
+               $border = "";
+               if (preg_match("/UA/", $c)) { $rgb = $rgb + 0x800000; }
+               if (preg_match("/3D/", $c)) { $rgb = $rgb + 0x8000; }
+               if (preg_match("/OV/", $c)) { $rgb = $rgb + 0xF0; }
+               if (preg_match("/mU/", $c)) { $rgb = $rgb + 0xA; }
+               if (preg_match("/deaktiviert/", $c)) { $rgb = 0xAAAAAA; }
+               if (preg_match("/gelb/", $c)) { $border = "border: 5px solid #a90;"; }
+               if (preg_match("/orange/", $c)) { $border = "border: 5px solid #d85;"; } ?>
+               <div style="padding: 2pt; color: #fff; background-color: <?= substr('00000' . dechex($rgb), -6); ?>; <?= $border ?>"><?= $c ?></div>
+<?php        } ?>
+           </td>
+<?php  }  ?>
+     </table>
+<?php } 
+
 
 function is_past($testday, $referenceday){
     if ( $testday <= 3 && $referenceday > 3 ) { return false; } 
@@ -91,7 +169,7 @@ function get_cache_or_remote($local, $remote) {
 
 $today = date("w");
 if ($today == 0) { $today = 7; }
-$qday = intval($_GET['day']);
+if (array_key_exists('day', $_GET)) { $qday = intval($_GET['day']); } else { $qday = 0; }
 if ($qday == 0) { $qday = $today; }
 
 $tag = $tage[$qday];
@@ -115,12 +193,12 @@ foreach($items as $item) {
         }
         $flags = array_diff($flags, array("ATMOS", "finity", "D-BOX", "Onyx LED"));
         array_push($flags, $vorstellung->{'belegung_ampel'});
-        if ($vorstellung->{'deaktiviert'} == true) { array_push($flags, "deaktiviert"); };
+        if (property_exists($vorstellung, 'deaktiviert') && $vorstellung->{'deaktiviert'} == true) { array_push($flags, "deaktiviert"); };
 
         $y = strftime("%H:%M");
         $d = $vorstellung->{'tag_der_woche'};
         $u = $vorstellung->{'uhrzeit'};
-        $f = $item->{'film_titel'};
+        $f = (property_exists($item, 'film_neu') && $item->{'film_neu'} ? "<span class='neu'>" . $item->{'film_neu'} . "!</span> ": "") . $item->{'film_titel'};
         $filme[$f] = preg_replace("/\"/", "'", $item->{'film_beschreibung'});
 
         $show = true;
@@ -128,8 +206,8 @@ foreach($items as $item) {
         if (array_key_exists('from', $_GET) && $_GET['from'] > $u)       { $show = false; }
         if (array_key_exists('to',   $_GET) && $_GET['to']   < $u)       { $show = false; }
         if ($qday == $today && $u < $y && !array_key_exists('from', $_GET) && !array_key_exists('to', $_GET) 
-            && !array_key_exists('all', $_GET)) { $show = $false; } // ignoriere vergangene sendungen fuer heute
-        if ($d != $qday) { $show = $false; } // ignoriere alle tage ausser den abgefragten
+            && !array_key_exists('all', $_GET)) { $show = false; } // ignoriere vergangene sendungen fuer heute
+        if ($d != $qday) { $show = false; } // ignoriere alle tage ausser den abgefragten
 
         if ($show == true) { // dupe check
               if (! array_key_exists($f, $instances))     { $instances[$f] = array(); }
@@ -141,26 +219,28 @@ foreach($items as $item) {
   }
 }
 
-uasort($instances, function(array $x, array $y) {return $x <=> $y; });
-$sorted_filme = array_keys($instances);
 
 ?>
 <html>
   <header>
    <style>
+     body {
+       font-size: 0.8rem;
+       font-family: Arial;
+     }
      table, td, th {
-       z-index: -999;
+       font-size: 0.8rem;
        border: 1px black solid;
        border-collapse: collapse;
  	   border-spacing: 0px;
      }
      td.rotate {
        padding: 10px;
-       height: 120pt;
+       height: 200pt;
      }
      .rotate {
        text-align: center;
-       white-space: nowrap;
+       /* white-space: nowrap; */ 
        vertical-align: middle !important;
        width: 1.5em;
      }
@@ -173,8 +253,13 @@ $sorted_filme = array_keys($instances);
      }
      #links {
          background-color: #ecf; 
-         padding: 3pt;
+         padding: 5px;
+         /* evil hack to stop the table headers to block the links */
+         position: relative;
          z-index: 9999;
+     }
+     #links span {
+         padding: 5px;
      }
      #legend {
          background-color: #cef; 
@@ -188,6 +273,17 @@ $sorted_filme = array_keys($instances);
          background-color: #c12;
          color: #fff;
      }
+     .neu {
+         font-weight: 800;
+         color: #b52;
+     }
+     .today { 
+         background-color: #bad; 
+     }
+     .qday {
+         border: 3pt solid #099;
+         border-radius: 5pt;
+     }
    </style>
  </header>
  <body>
@@ -195,9 +291,15 @@ $sorted_filme = array_keys($instances);
      <div id="links">
 <?php 
        foreach ($tage as $loop => $loopname) {
-                 if ($loop == $qday)         { print(" <b><span style='background-color: #bad; padding: 5pt;'>" . $tage[$loop] ."</span></b>"); 
-          } else if (is_past($loop, $today)) { print(" <span>"  . $tage[$loop] ."</span>"); 
-          } else                             { print(" <a href='/?day=" . $loop ."'>" . $tage[$loop] . "</a>"); }
+          $class = "links";
+          if ($loop == $qday)   { $class .= " qday";  }
+          if ($loop == $today)  { $class .= " today"; }
+
+          if (is_past($loop, $today)) { 
+              print(" <span class='$class'>"  . $tage[$loop] ."</span>"); 
+          } else { 
+              print(" <span class='$class'><a href='/?day=" . $loop ."'>" . $tage[$loop] . "</a></span>"); 
+          }
  
        }  ?>
        (<?= $qday ?> / <?= $today ?>)
@@ -217,42 +319,17 @@ $sorted_filme = array_keys($instances);
        print("Dont look back in anger (You asked for a day that's past today)");
        exit();
      }
-?>
-     <table id="movies">
-       <tr> <!-- header -->
-         <td>/</td>
-<?php    foreach($kinos as $kino => $w) { ?>
-           <td class='rotate'>
-             <div title="<?= $kinos[$kino] ?>">
-               <?= $kino ?>
-             </div>
-           </td>
-<?php    } ?>
-       </tr>
 
-<?php  foreach(array_reverse($sorted_filme) as $film => $v) { ?>
-         <tr<?= (preg_match("/OV/", $v))? " style='background-color: #cef;'" :""?>>
-           <td title="<?= $filme[$v] ?>" ><?= $v ?></td>
-<?php      foreach($kinos as $kino => $w) { 
-             if (array_key_exists($v, $instances) && array_key_exists($kino, $instances[$v])) { 
-               $rgb = 0; $color = "#fff";
-               $border = "";
-               $cell = join("<br>", $instances[$v][$kino]);
-               if (preg_match("/UA/", $cell)) { $rgb = $rgb + 0x800000; }
-               if (preg_match("/3D/", $cell)) { $rgb = $rgb + 0x8000; }
-               if (preg_match("/OV/", $cell)) { $rgb = $rgb + 0xF0; }
-               if (preg_match("/mU/", $cell)) { $rgb = $rgb + 0xA; }
-               if (preg_match("/deaktiviert/", $cell)) { $rgb = 0xAAAAAA; }
-               if (preg_match("/gelb/", $cell)) { $border = "border: 5px solid #a90;"; }
-               if (preg_match("/orange/", $cell)) { $border = "border: 5px solid #d85;"; }
-      ?>       <td style='padding: 2px; <?= $border ?>; color: #fff; background-color: #<?= substr('00000' . dechex($rgb), -6); ?>;'>
-                 <?= $cell ?>
-               </td>
-<?php        } else { print("<td/>"); }
-           } ?>
-         </tr>
-<?php  }  ?>
-     </table>
+/* __ the actual table __ */
+     if (! array_key_exists('by', $_GET) || $_GET['by'] == 'theater' ) {
+       display_table_by_theater($kinos, $instances); 
+     } else if ($_GET['by'] == 'movie' ) {
+       display_table_by_movie($kinos, $instances); 
+     } else {
+       print("invalid 'BY' parameter");
+     }
+
+?>
      <small><a href='https://gl.v4.x20.space/mc/cine/-/blob/main/index.php'>code</a></small>
   </body>
 </html>
