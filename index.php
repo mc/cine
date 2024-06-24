@@ -110,7 +110,7 @@ function display_table_by_movie($k, $f) {
      <table id="movies">
        <tr>
 <?php    foreach($sorted_filme as $film => $v) { ?>
-           <td class='rotate'><div title="<?= $f[$v] ?>" ><?= $v ?></div></td>
+           <td style="vertical-align: bottom;"><div style="text-align:center;" title="<?= $f[$v] ?>" ><?= $v ?></div></td>
 <?php    }  ?>
        </tr>
 <?php  foreach($sorted_filme as $film => $v) { ?>
