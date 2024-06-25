@@ -330,6 +330,6 @@ foreach($items as $item) {
      }
 
 ?>
-     <small><a href='https://gl.v4.x20.space/mc/cine/-/blob/main/index.php'>code</a></small>
+     <small><a href='https://gl.v4.x20.space/mc/cine/-/blob/main/index.php'>code</a> or <a href='https://github.com/mc/cine/blob/main/index.php'>fork</a></small>
   </body>
 </html>
